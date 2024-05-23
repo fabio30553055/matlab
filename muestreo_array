@@ -1,0 +1,60 @@
+%*************************************************************************************
+% ARRAY MUSIC 
+% AUTOR FABIO RIVADENEIRA
+%UNIVERSIDAD DEL VALLE-CALI COLOMBIA 2024
+
+%*************************************************************************************
+%*************************************************************************************
+
+% Cargar el archivo de audio
+clear ;
+clc;
+
+[file, path] = uigetfile({'*.mp3';'*.wav'}, 'Selecciona un archivo de audio');
+if isequal(file, 0)
+    disp('No se seleccionó ningún archivo.');
+    return;
+end
+
+% Lee el archivo de audio
+[originalAudio, originalFs] = audioread(fullfile(path, file));
+
+originalAudio=originalAudio*0.6;
+% Nueva frecuencia de muestreo
+newFs = 16000; 
+
+% Cambia la frecuencia de muestreo del audio
+resampledAudio = resample(originalAudio, newFs, originalFs);
+
+% Normaliza el audio entre 0 y 1
+normalizedAudio = (resampledAudio - min(resampledAudio)) / (max(resampledAudio) - min(resampledAudio));
+
+% Convierte los valores del audio a unsigned char (0-255)
+audioUint8 = uint8(normalizedAudio * 255);%255
+
+% Tamaño del bloque
+blockSize = 1000000;
+numBlocks = ceil(length(audioUint8) / blockSize);
+
+% Genera los archivos en bloques
+for i = 1:numBlocks
+    startIdx = (i-1) * blockSize + 1;
+    endIdx = min(i * blockSize, length(audioUint8));
+    blockData = audioUint8(startIdx:endIdx);
+    blockSizeActual = length(blockData);
+    
+    % Genera el array para C
+    arrayStr = sprintf('%d, ', blockData);
+    arrayStr = arrayStr(1:end-2); % Elimina la última coma y espacio
+    
+    % Crea el contenido del archivo en formato C
+    headerStr = sprintf('const unsigned char musica[%d] = {%s};', blockSizeActual, arrayStr);%sprintf('const unsigned char musica_%d[%d] = {%s};', i, blockSizeActual, arrayStr);
+    
+    % Escribe el array en un archivo .h para su uso en C
+    outputFile = fullfile(path, sprintf('%s_FA_%d.h', file(1:end-4), i));%fullfile(path, sprintf('%s_macarena_%d.h', file(1:end-4), i));
+    fid = fopen(outputFile, 'wt');
+    fprintf(fid, headerStr);
+    fclose(fid);
+    
+    disp(['El archivo ha sido procesado y guardado en: ' outputFile]);
+end
