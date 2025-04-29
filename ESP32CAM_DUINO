@@ -1,0 +1,166 @@
+
+#include <esp_camera.h>
+#define SELE 13
+#define LED1 14
+#define LED2 12
+#define LED3 15
+
+// Configuración de pines del ESP32-CAM
+#define PWDN_GPIO_NUM  32
+#define RESET_GPIO_NUM -1
+#define XCLK_GPIO_NUM  0
+#define SIOD_GPIO_NUM  26
+#define SIOC_GPIO_NUM  27
+
+#define Y9_GPIO_NUM    35
+#define Y8_GPIO_NUM    34
+#define Y7_GPIO_NUM    39
+#define Y6_GPIO_NUM    36
+#define Y5_GPIO_NUM    21
+#define Y4_GPIO_NUM    19
+#define Y3_GPIO_NUM    18
+#define Y2_GPIO_NUM    5
+#define VSYNC_GPIO_NUM 25
+#define HREF_GPIO_NUM  23
+#define PCLK_GPIO_NUM  22
+
+camera_fb_t *fb = NULL; // puntero al buffer que almacena la imagen
+
+void setup() {
+  
+  Serial.begin(115200); // Inicializa la comunicación serial
+  pinMode(SELE, INPUT_PULLUP);
+  pinMode(4, OUTPUT);
+  pinMode(LED1, OUTPUT);
+  digitalWrite(LED1, LOW);
+
+  pinMode(LED2, OUTPUT);
+  digitalWrite(LED2, LOW);
+  pinMode(LED3, OUTPUT);
+  digitalWrite(LED3, LOW);
+
+// CONFIGURACION DE LA CAMARA
+
+  camera_config_t config;
+  config.ledc_channel = LEDC_CHANNEL_0;
+  config.ledc_timer = LEDC_TIMER_0;
+  config.pin_d0 = Y2_GPIO_NUM;
+  config.pin_d1 = Y3_GPIO_NUM;
+  config.pin_d2 = Y4_GPIO_NUM;
+  config.pin_d3 = Y5_GPIO_NUM;
+  config.pin_d4 = Y6_GPIO_NUM;
+  config.pin_d5 = Y7_GPIO_NUM;
+  config.pin_d6 = Y8_GPIO_NUM;
+  config.pin_d7 = Y9_GPIO_NUM;
+  config.pin_xclk =     XCLK_GPIO_NUM;
+  config.pin_pclk =     PCLK_GPIO_NUM;
+  config.pin_vsync =    VSYNC_GPIO_NUM;
+  config.pin_href =     HREF_GPIO_NUM;
+  config.pin_sscb_sda = SIOD_GPIO_NUM;
+  config.pin_sscb_scl = SIOC_GPIO_NUM;
+  config.pin_pwdn =     PWDN_GPIO_NUM;
+  config.pin_reset =    RESET_GPIO_NUM;
+  config.xclk_freq_hz = 20000000;
+  config.pixel_format = PIXFORMAT_GRAYSCALE;//PIXFORMAT_JPEG; // RGB565
+  config.fb_location =  CAMERA_FB_IN_PSRAM;
+
+  // Selección de resolución
+  config.frame_size = FRAMESIZE_QQVGA; // QVGA 320x240 QQVGA 160*120
+  config.fb_count = 1;
+
+  // Inicialización de la cámara
+  if (esp_camera_init(&config) != ESP_OK) {
+    
+    while(1){  //************************
+      digitalWrite(LED1, HIGH);
+      delay(1200);
+      digitalWrite(LED1, LOW);
+      delay(1200);
+   }         //**************************
+    return;
+  }
+
+  else{
+    
+    for(int j=0;j<10;j++){
+
+      digitalWrite(LED1, HIGH);
+      delay(50);
+      digitalWrite(LED1, LOW);
+      delay(50);
+    }
+  }
+
+  delay(500);
+  digitalWrite(LED1, HIGH);
+
+
+}
+
+void loop() {
+
+   uint8_t rx_ok = scan_x();
+
+  if(digitalRead(SELE) == 0 || rx_ok == 1) { //si se presiona el boton SELE
+    digitalWrite(LED2, HIGH);
+    digitalWrite(4, HIGH);
+    delay(300);
+
+  if (fb != NULL) {
+   esp_camera_fb_return(fb);
+   fb = NULL;
+  }
+
+    fb = esp_camera_fb_get(); // Captura la imagen 
+    digitalWrite(4, LOW);
+    
+  if (!fb) {
+    
+    delay(100);
+    return;        ////***********************************
+  }
+  //uint16_t tam_len = fb ->
+  int img_tam = fb->len;//19200
+  if(img_tam != 19200){img_tam = 19200;}
+  unsigned char data;
+
+  digitalWrite(LED1, LOW);//indicador de inicio de envio
+  Serial.println("CAPTURA");//se envia la palabra CAPTURA a Matlab para indicar inicio
+  delay(100);
+  // Envío de los datos de la imagen 
+  for (int i = 0; i < img_tam; i++) {
+    data = fb->buf[i]; //img_test[i];
+    Serial.write(data); 
+    delayMicroseconds(100);
+  }
+
+  esp_camera_fb_return(fb); // Liberar el frame buffer
+  digitalWrite(LED1, HIGH);
+  delay(10); 
+  digitalWrite(LED2, LOW);  // el led indica el final de la captura
+  }
+
+
+}
+
+
+uint8_t scan_x(){
+
+  uint8_t data_x=0;
+   if (Serial.available() > 0) {
+
+    char incomingByte = Serial.read();
+    // Verificar si es la letra 'X' (mayúscula o minúscula)
+    if (incomingByte == 'X' || incomingByte == 'x') {
+      
+      data_x = 1;
+    }
+
+
+  }
+
+
+  return data_x;
+
+}
+
