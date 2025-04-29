@@ -1,0 +1,64 @@
+
+
+%% condiciones iniciales
+clear s;
+clear 
+close all
+clc
+%% Configuración del puerto serial
+serialPort = 'COM8'; 
+baudRate = 115200;
+s = serialport(serialPort, baudRate);
+pause(1); 
+%% verificamos si hay datos en el buffer
+cnt_dat = s.NumBytesAvailable; 
+if cnt_dat > 0
+    %flush(s);% limpio el buffer
+end
+%% Dimensiones de la imagen
+width = 160; % Ancho de la imagen
+height = 120; % Alto de la imagen
+%imageSize = width * height;
+%% Lee los datos enviados por el ESP32
+writeline(s, 'X'); % Envía "X" al ESP32 
+disp('Solicitud de imagen enviada (X).');
+disp('Esperando el inicio de la imagen...');
+while true
+   
+    line = readline(s);
+    if strcmp(strip(line), 'CAPTURA')
+        break;
+    end
+end
+disp('Inicio de la imagen recibido.');
+%-----------------  barra de espera para llegada de datos ------------------------
+h = waitbar(0,'1','Name','Espere..operacion en progreso :)');
+
+while(s.NumBytesAvailable < 19200)
+    esp = (s.NumBytesAvailable /19200)*100;
+    esp = round(esp);
+    waitbar(esp/100,h,['Recibiendo: ', sprintf('%3d%%', esp)]);
+end
+
+close(h);
+%-----------------    ------------------------      -----------------------------
+tic
+imageSize = s.NumBytesAvailable;% para verificar los dats a recibir
+data_img = read(s, imageSize, 'uint8');
+toc
+
+%% Vector a una matriz de 160 x 120
+imageMatrix = reshape(data_img, [width, height])';
+img_fa = mat2gray(imageMatrix);
+save('miimagen.jpg','img_fa');
+% Muestra la imagen en escala de grises
+figure
+imshow(img_fa);
+title('Imagen capturada');
+%% verificamos si hay datos en el buffer
+cnt_dat = s.NumBytesAvailable; 
+if cnt_dat > 0
+ flush(s);% limpio el buffer
+end
+%% Cerrar el puerto serial
+clear s;
